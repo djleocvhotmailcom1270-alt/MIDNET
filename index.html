@@ -284,7 +284,7 @@
 
     <div id="toast">Link copiado!</div>
 
-    <iframe id="app-frame" src="http://192.168.75.2:7000/"></iframe>
+    <iframe id="app-frame" data-src="http://192.168.75.2:7000/"></iframe>
 
     <script src="config.js"></script>
     <script>
@@ -333,9 +333,10 @@
             e.preventDefault();
             deferredPrompt = e;
 
-            // Show the custom modal immediately
+            // Show the custom modal and hide status as soon as prompt is ready
             installModal.style.display = 'block';
-            status.style.display = 'none';
+            status.style.opacity = '0';
+            setTimeout(() => { if(status.style.opacity === '0') status.style.display = 'none'; }, 500);
 
             console.log('Install prompt detected and ready');
         });
@@ -358,8 +359,9 @@
         skipBtn.addEventListener('click', () => {
             installModal.style.display = 'none';
             status.style.display = 'block';
+            status.style.opacity = '1';
             status.innerText = 'Abrindo no navegador...';
-            setTimeout(showApp, 1000);
+            setTimeout(showApp, 500);
         });
 
         // Copy Link logic
@@ -367,20 +369,6 @@
             navigator.clipboard.writeText(shareUrl).then(() => {
                 showToast('Link da rede copiado!');
             });
-        });
-
-        // Share logic
-        shareBtn.addEventListener('click', () => {
-            if (navigator.share) {
-                navigator.share({
-                    title: 'L-STORE',
-                    text: 'Instale o L-STORE no seu celular!',
-                    url: shareUrl
-                }).catch(console.error);
-            } else {
-                // Fallback to copy if share not supported
-                copyBtn.click();
-            }
         });
 
         function showToast(text) {
@@ -401,11 +389,16 @@
         });
 
         function showApp() {
+            // Start loading frame early but keep hidden
+            if (!frame.src) {
+                frame.src = frame.getAttribute('data-src');
+            }
+            
             splash.style.opacity = '0';
             setTimeout(() => {
                 splash.style.display = 'none';
                 frame.style.display = 'block';
-            }, 600);
+            }, 500);
         }
 
         if ('serviceWorker' in navigator) {
@@ -416,12 +409,26 @@
             });
         }
 
-        // Auto-show app if installer doesn't appear in 6s
+        // Defer iframe source to allow PWA prompt to fire faster
+        window.addEventListener('load', () => {
+            if (!isStandalone) {
+                // Wait 2 seconds before loading the heavy iframe in the background
+                setTimeout(() => {
+                    if (!frame.src && splash.style.display !== 'none') {
+                        console.log('Lazy loading app frame...');
+                        frame.src = frame.getAttribute('data-src');
+                    }
+                }, 2000);
+            }
+        });
+
+        // Force transition if prompt doesn't appear and we were loading
         setTimeout(() => {
             if (!isStandalone && !deferredPrompt && splash.style.display !== 'none') {
-                showApp();
+                status.innerText = 'Iniciando sistema...';
+                setTimeout(showApp, 1000);
             }
-        }, 6000);
+        }, 8000);
     </script>
 </body>
 
